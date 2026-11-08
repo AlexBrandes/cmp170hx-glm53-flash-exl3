@@ -1,0 +1,35 @@
+This recipe (scripts and docs) is MIT-licensed; see LICENSE. docker/Dockerfile
+and docker/serve.sh come from https://github.com/AlexBrandes/vllm and keep its
+Apache-2.0 licence. The recipe builds on, and runs, the following work under
+their own terms.
+
+Engine
+- vLLM (https://github.com/vllm-project/vllm), Apache-2.0. The image is
+  upstream vLLM's wheel for commit a0d7356b98, the fork's vLLM branch over it and
+  the vllm-cmp170hx plugin, all from https://github.com/AlexBrandes/vllm, also
+  Apache-2.0 (see that repository's NOTICE), on NVIDIA's CUDA 13.0 Ubuntu 24.04
+  base image.
+- The plugin's EXL3 codec is adapted from turboderp's ExLlamaV3
+  (https://github.com/turboderp-org/exllamav3), MIT (copy in
+  licenses/ExLlamaV3.LICENSE).
+- The plugin's layout, startup guard and seam tooling, and its sm_80 GLM-5.3
+  code, are derived from vllm-sm80 by Morrowmake
+  (https://github.com/Morrowmake/vllm-cmp170hx), Apache-2.0.
+
+Model
+- GLM-5.3-Flash by Z.AI, MIT (copy in licenses/GLM-5.3-Flash.LICENSE). The EXL3
+  checkpoint turboderp/GLM-5.3-Flash-exl3 keeps that licence.
+- The DFlash2 drafter incoai/GLM-5.3-Flash-DFlash2 is CC BY-NC-ND 4.0:
+  non-commercial use only, no redistribution.
+- This repository ships no weights: download.sh fetches the checkpoint and the
+  drafter from their model pages.
+
+Benchmarks
+- Speed tables use the sparkDash protocol (MiaAI-Lab/sparkDash, commit
+  3e6d4ef, Apache-2.0); its prompts are used as data with attribution.
+- GSM8K (OpenAI, MIT) as distributed with vLLM's tests/evals/gsm8k, HumanEval
+  (OpenAI, MIT), and GPQA Diamond (Rein et al., CC BY 4.0) with the prompt and
+  answer pattern of OpenAI simple-evals (MIT).
+
+Not affiliated with NVIDIA, Z.AI, turboderp, incoai, the vLLM project or any of
+the projects above.
