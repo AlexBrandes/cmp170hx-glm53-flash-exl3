@@ -1,0 +1,469 @@
+{
+ "schema_version": 1,
+ "measured": "2026-11-11",
+ "hardware": {
+  "gpu": "2x NVIDIA CMP 170HX",
+  "memory_gib_per_gpu": 64,
+  "sm_count_per_gpu": 74,
+  "power_w_per_gpu": 170,
+  "pcie": "Gen2 x4 per GPU",
+  "gpu_p2p": false,
+  "driver": "610.43.02"
+ },
+ "engine": {
+  "upstream_commit": "a0d7356b98e929c17051bac44f5a086e4117974d",
+  "vllm_branch_commit": "ea2ef399a614ea72b65b15804000342f629a850f",
+  "plugin_commit": "0c79bc78fdc30708f1995d5759828d2a08e39f04",
+  "measured_source_sha256": "9420de6a70dd650844860945d5e4384b3eb3294f0d6d49fd7ed9e41f49676854",
+  "measured_source_note": "sha256 of the GitHub codeload archives the Dockerfile fetches: vLLM branch, then plugin",
+  "measured_image_id": "sha256:daa037541ed91b304c5f4168b6dad4820362ef25c1e6ba3193bf5aef562ed076",
+  "published_image": "ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:daa037541ed91b304c5f4168b6dad4820362ef25c1e6ba3193bf5aef562ed076",
+  "measured_image_build": "docker build --no-cache of this Dockerfile on the measured host",
+  "native_extension_sha256": "316dccf116412a8c24f834613a569deecea20dae2f8705fff9003957de8a521f",
+  "int8_library_sha256": [
+   "abb1704b2f29f68ce6b4575277026f9d2d989652ea1cb61d333466069e3bf5a6",
+   "2658b58650db7900dd12a62c2f04c1135a685922ebd495e47c06403510c47e72"
+  ],
+  "note": "the native code is compiled at build time; a rebuild has its own image identity and hashes"
+ },
+ "checkpoint": {
+  "repo": "turboderp/GLM-5.3-Flash-exl3",
+  "branch": "sc_2.60bpw",
+  "revision": "24781209f2862a939cc21e01d256c943bd1a58a3"
+ },
+ "drafter": {
+  "repo": "incoai/GLM-5.3-Flash-DFlash2",
+  "revision": "bf582e4eacc1810f76656d1811693ff6c6737d2a"
+ },
+ "protocol": {
+  "source": "sparkDash",
+  "commit": "3e6d4ef",
+  "endpoint": "engine-direct",
+  "decode_max_tokens": 400,
+  "depth_decode": "benchlib addition, not sparkDash"
+ },
+ "run_ids": [
+  "public-v1.20261111T042114Z.3a15aad3",
+  "public-v1.20261111T053802Z.9ac5d59f",
+  "public-v1.20261111T055049Z.0d9ce7b0"
+ ],
+ "settings": {
+  "quantization": "exl3",
+  "load-format": "exl3",
+  "dtype": "bfloat16",
+  "pipeline-parallel-size": 2,
+  "tensor-parallel-size": 1,
+  "mm-encoder-tp-mode": "data",
+  "max-model-len": 225280,
+  "max-num-seqs": 4,
+  "max-num-batched-tokens": 2048,
+  "prefill-chunk-with-decodes": 512,
+  "block-size": 4608,
+  "gpu-memory-utilization": 0.97,
+  "enable-auto-tool-choice": true,
+  "tool-call-parser": "glm47",
+  "reasoning-parser": "glm47",
+  "enable-prompt-tokens-details": true,
+  "compilation-config": "{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}",
+  "speculative-config": "{\"method\": \"dflash\", \"model\": \"/draft\", \"num_speculative_tokens\": 3, \"quantization\": null, \"draft_load_config\": {\"load_format\": \"safetensors\"}}",
+  "hf-overrides": "{\"text_config\": {\"aux_hidden_state_tensor\": \"stream_mean\"}}"
+ },
+ "measurement_additions": {
+  "flags": [
+   "--enable-per-request-metrics",
+   "--cudagraph-metrics"
+  ],
+  "environment": {
+   "VLLM_KV_PLAN_LOG": "1"
+  },
+  "note": "benchlib instrumentation beside serve.sh; the chat template mounted is this recipe's chat_template.jinja"
+ },
+ "environment": {
+  "VLLM_PP_LAYER_PARTITION": "23,22",
+  "VLLM_PP_SPREAD_DECODES": "1",
+  "VLLM_PP_HOMOGENEOUS_STEPS": "1",
+  "VLLM_SM80_KDA_PREFILL": "1",
+  "VLLM_EXL3_MOE_PREFILL_TC": "1",
+  "VLLM_EXL3_DENSE_PREFILL_TC": "1",
+  "VLLM_EXL3_DENSE_PREFILL_ONE_PRODUCT": "float",
+  "VLLM_EXL3_MOE_DECODE_TC": "1",
+  "VLLM_EXL3_MOE_DECODE_TC_MODE": "full",
+  "VLLM_EXL3_DENSE_DECODE_TC": "1",
+  "VLLM_EXL3_DENSE_DECODE_TC_FAMILIES": "all",
+  "VLLM_EXL3_DENSE_DECODE_SPLITK": "1",
+  "VLLM_EXL3_DECODE_VARIANT": "off",
+  "VLLM_EXL3_DENSE_W8": "/w8/dense.safetensors"
+ },
+ "decode": {
+  "structured": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": [
+     102.339,
+     101.715,
+     101.321
+    ],
+    "median_aggregate_decode_tps": 101.715
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": [
+     161.432,
+     160.007,
+     159.735
+    ],
+    "median_aggregate_decode_tps": 160.007
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": [
+     222.94,
+     221.749,
+     229.26
+    ],
+    "median_aggregate_decode_tps": 222.94
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": [
+     189.585,
+     205.765,
+     200.54
+    ],
+    "median_aggregate_decode_tps": 200.54
+   }
+  ],
+  "prose": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": [
+     75.977,
+     75.963,
+     75.68
+    ],
+    "median_aggregate_decode_tps": 75.963
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": [
+     111.581,
+     110.876,
+     120.504
+    ],
+    "median_aggregate_decode_tps": 111.581
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": [
+     169.241,
+     165.351,
+     165.951
+    ],
+    "median_aggregate_decode_tps": 165.951
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": [
+     145.718,
+     141.722,
+     151.013
+    ],
+    "median_aggregate_decode_tps": 145.718
+   }
+  ],
+  "code": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": [
+     88.518,
+     88.094,
+     88.252
+    ],
+    "median_aggregate_decode_tps": 88.252
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": [
+     131.889,
+     128.156,
+     132.275
+    ],
+    "median_aggregate_decode_tps": 131.889
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": [
+     170.513,
+     169.247,
+     180.106
+    ],
+    "median_aggregate_decode_tps": 170.513
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": [
+     158.252,
+     163.068,
+     169.648
+    ],
+    "median_aggregate_decode_tps": 163.068
+   }
+  ],
+  "json": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": [
+     87.488,
+     89.198,
+     87.076
+    ],
+    "median_aggregate_decode_tps": 87.488
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": [
+     147.682,
+     147.476,
+     147.632
+    ],
+    "median_aggregate_decode_tps": 147.632
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": [
+     193.082,
+     193.319,
+     195.402
+    ],
+    "median_aggregate_decode_tps": 193.319
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": [
+     183.236,
+     186.283,
+     183.197
+    ],
+    "median_aggregate_decode_tps": 183.236
+   }
+  ]
+ },
+ "prefill": [
+  {
+   "target_tokens": 4096,
+   "prompt_tokens": [
+    4127,
+    4129,
+    4132
+   ],
+   "prefill_tps": [
+    2479.04,
+    2448.27,
+    2473.91
+   ],
+   "median_prefill_tps": 2473.91
+  },
+  {
+   "target_tokens": 8192,
+   "prompt_tokens": [
+    8223,
+    8224,
+    8225
+   ],
+   "prefill_tps": [
+    2540.9,
+    2541.08,
+    2555.21
+   ],
+   "median_prefill_tps": 2541.08
+  },
+  {
+   "target_tokens": 16384,
+   "prompt_tokens": [
+    16413,
+    16415,
+    16416
+   ],
+   "prefill_tps": [
+    2521.35,
+    2508.22,
+    2525.93
+   ],
+   "median_prefill_tps": 2521.35
+  },
+  {
+   "target_tokens": 32768,
+   "prompt_tokens": [
+    32799,
+    32800,
+    32801
+   ],
+   "prefill_tps": [
+    2503.69,
+    2501.31,
+    2496.84
+   ],
+   "median_prefill_tps": 2501.31
+  },
+  {
+   "target_tokens": 65536,
+   "prompt_tokens": [
+    65567,
+    65567,
+    65567
+   ],
+   "prefill_tps": [
+    2475.6,
+    2471.23,
+    2469.27
+   ],
+   "median_prefill_tps": 2471.23
+  },
+  {
+   "target_tokens": 131072,
+   "prompt_tokens": [
+    131105,
+    131101,
+    131105
+   ],
+   "prefill_tps": [
+    2424.17,
+    2419.87,
+    2420.48
+   ],
+   "median_prefill_tps": 2420.48
+  }
+ ],
+ "depth_decode": [
+  {
+   "target_tokens": 4096,
+   "decode_tps": [
+    70.823,
+    70.545,
+    70.655
+   ],
+   "median_decode_tps": 70.655
+  },
+  {
+   "target_tokens": 8192,
+   "decode_tps": [
+    70.365,
+    74.672,
+    73.103
+   ],
+   "median_decode_tps": 73.103
+  },
+  {
+   "target_tokens": 16384,
+   "decode_tps": [
+    71.137,
+    71.897,
+    69.422
+   ],
+   "median_decode_tps": 71.137
+  },
+  {
+   "target_tokens": 32768,
+   "decode_tps": [
+    71.335,
+    68.328,
+    70.457
+   ],
+   "median_decode_tps": 70.457
+  },
+  {
+   "target_tokens": 65536,
+   "decode_tps": [
+    73.065,
+    66.792,
+    69.444
+   ],
+   "median_decode_tps": 69.444
+  },
+  {
+   "target_tokens": 131072,
+   "decode_tps": [
+    71.667,
+    74.981,
+    72.674
+   ],
+   "median_decode_tps": 72.674
+  }
+ ],
+ "quality": {
+  "correctness": {
+   "run_id": "correctness-v1.20261111T041942Z.4a421b6f",
+   "verdict": "valid"
+  },
+  "needle": {
+   "run_id": "quality-gate.20261111T043447Z.90e3bde4",
+   "passed": 16,
+   "total": 16,
+   "contexts": [
+    "4k",
+    "16k",
+    "32k",
+    "64k"
+   ]
+  },
+  "context_window": {
+   "run_id": "quality-gate.20261111T043644Z.14110a2d",
+   "max_model_len": 225280,
+   "accepted_prompt_tokens": 225279,
+   "refused_prompt_tokens": 225280
+  },
+  "humaneval": {
+   "run_id": "quality-gate.20261111T043831Z.722c28a6",
+   "pass_at_1": {
+    "chat": {
+     "passed": 141,
+     "total": 164
+    },
+    "completion": {
+     "passed": 124,
+     "total": 164
+    }
+   },
+   "protocol": {
+    "chat": "EvalPlus instruct prompt, 1,024 tokens, thinking off, greedy",
+    "completion": "Codex-paper raw prompt on /v1/completions, 512 tokens, standard stop strings",
+    "scoring": "OpenAI human_eval check_correctness, 3 s limit"
+   }
+  },
+  "gsm8k": {
+   "run_id": "quality-gate.20261111T045000Z.ba522e0e",
+   "accuracy": {
+    "chat": {
+     "passed": 1228,
+     "total": 1319
+    },
+    "completion": {
+     "passed": 1192,
+     "total": 1319
+    }
+   },
+   "protocol": {
+    "source": "vLLM tests/evals/gsm8k/gsm8k_eval.py, 5-shot, last integer in the reply",
+    "chat": "--use-chat-completions mode, 1,024 tokens, thinking off, temperature 0",
+    "completion": "script default, 256 tokens, temperature 0"
+   }
+  },
+  "vision": {
+   "passed": 7,
+   "total": 7
+  },
+  "gpqa_diamond": {
+   "run_id": "quality-gate.20261111T060333Z.e1571000",
+   "passed": 174,
+   "total": 198,
+   "protocol": "OpenAI simple-evals prompt and answer pattern; thinking on, temperature 1.0, top_p 0.95, 65,536 tokens per reply, one pass"
+  }
+ },
+ "dense_weights": {
+  "source_repo": "zai-org/GLM-5.3-Flash",
+  "source_revision": "46a050bec13002ad29ee795c16e61cf4fa3c4a9c",
+  "built_by": "download.sh (tools/fetch_dense.py + tools/convert_dense.py in the engine image) on the measured host",
+  "sidecar_sha256": "b19fbe54f04b35298cb17bb1553086a99c657fea114f5e8aac611fe164310af9",
+  "matrices": 259
+ }
+}

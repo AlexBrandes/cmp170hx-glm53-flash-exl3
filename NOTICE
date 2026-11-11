@@ -19,6 +19,9 @@ Engine
 Model
 - GLM-5.3-Flash by Z.AI, MIT (copy in licenses/GLM-5.3-Flash.LICENSE). The EXL3
   checkpoint turboderp/GLM-5.3-Flash-exl3 keeps that licence.
+  download.sh also fetches the dense text weights of the original checkpoint
+  zai-org/GLM-5.3-Flash and builds an INT8 copy from them (tools/convert_dense.py);
+  that copy is a derivative under the same licence.
 - The DFlash2 drafter incoai/GLM-5.3-Flash-DFlash2 is CC BY-NC-ND 4.0:
   non-commercial use only, no redistribution.
 - This repository ships no weights: download.sh fetches the checkpoint and the
