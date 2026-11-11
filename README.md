@@ -1,17 +1,12 @@
 # GLM-5.3-Flash on 2× CMP 170HX
 
-**GLM-5.3-Flash (EXL3, 2.60 bpw) on two NVIDIA CMP 170HX cards, pipeline-parallel
-with vLLM: 102 tok/s for one user (structured), 223 tok/s across four, about 2,400–2,500
-tok/s prefill from 4k to 128k prompts, a 225,280-token window, image and video
-input, and HumanEval 141/164, GSM8K 1,228/1,319, GPQA Diamond 174/198.** Measured
-on PCIe Gen2 x4 links.
+This runs GLM-5.3-Flash on two NVIDIA CMP 170HX cards, with the model split
+between them. It uses vLLM with turboderp's 2.6-bit EXL3 version of the model and
+serves an OpenAI-compatible API that accepts text, images and video. The cards
+don't need a fast link between them; a PCIe Gen2 x4 connection each is enough.
 
-Serves turboderp's [EXL3 quantization of GLM-5.3-Flash](https://huggingface.co/turboderp/GLM-5.3-Flash-exl3)
-with upstream vLLM and the [vllm-cmp170hx](https://github.com/AlexBrandes/vllm)
-plugin in a container: an OpenAI-compatible API with text, image and video
-input, DFlash speculative decoding, reasoning and tool calls. The plugin carries
-tensor-core EXL3 kernels for these cards (sm_80) for both prefill and decode;
-everything runs on the two GPUs.
+One user gets around 75–100 tokens per second, depending on what's being
+generated. The full numbers and quality checks are under [Benchmarks](#benchmarks).
 
 ```bash
 git clone https://github.com/AlexBrandes/cmp170hx-glm53-flash-exl3
