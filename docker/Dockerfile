@@ -11,8 +11,8 @@ ARG VLLM_WHEEL=https://wheels.vllm.ai/a0d7356b98e929c17051bac44f5a086e4117974d/v
 ARG VLLM_WHEEL_SHA256=5e293d985d0e3964538c989d6123d1b073c2c12d5384c5429e7357868e9e47e2
 ARG VLLM_BRANCH_COMMIT=ea2ef399a614ea72b65b15804000342f629a850f
 ARG VLLM_BRANCH_SHA256=f67a1f89f71d6ff1d17f309bf7845f6dfa6ed80ba57379561cd2d6f6b0db4548
-ARG PLUGIN_COMMIT=d5cb84150bb0327224d7caa72aae1135f2bd2d92
-ARG PLUGIN_SHA256=c479fc1e4fe8871031d9b840906ef25769043ffedb9ae8cb4ac015c427e32daa
+ARG PLUGIN_COMMIT=0c79bc78fdc30708f1995d5759828d2a08e39f04
+ARG PLUGIN_SHA256=61908a9db6aa474a6da18087a973d651f1defc0f00a303587dfd2b7c6c1f8c6a
 
 ENV DEBIAN_FRONTEND=noninteractive \
     VIRTUAL_ENV=/opt/venv \
@@ -56,6 +56,17 @@ RUN curl -fsSL -o /tmp/plugin.tar.gz \
     && python -c "import importlib.metadata as m; \
 assert [e.value for e in m.entry_points(group='vllm.general_plugins') if e.name == 'cmp170hx'] == ['vllm_cmp170hx.plugin:register']; \
 assert [e.value for e in m.entry_points(group='vllm.platform_plugins') if e.name == 'cmp170hx'] == ['vllm_cmp170hx.plugin:platform_plugin']"
+
+# 4. The plugin's INT8 kernels for the dense sidecar path (csrc/exl3/lab_once):
+#    rotation + int8 activation quantization and rebuild kernels, and a 128x256x64
+#    INT8 CUTLASS GEMM (CUTLASS headers from the vLLM wheel).
+RUN cd /opt/vllm-cmp170hx/csrc/exl3 && mkdir -p /opt/exl3-once \
+    && SP=$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])') \
+    && TI=$SP/torch/include && CUT=$SP/vllm/third_party/fmha_sm100/cutlass \
+    && ABI=$(python -c 'import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))') \
+    && F="-O3 -std=c++20 -gencode=arch=compute_80,code=sm_80 --expt-relaxed-constexpr -DNDEBUG -Xcompiler -fPIC -shared -isystem $TI -isystem $TI/torch/csrc/api/include -D_GLIBCXX_USE_CXX11_ABI=$ABI -L$SP/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch" \
+    && nvcc $F -I. lab_once/exl3_i8_lab.cu -o /opt/exl3-once/exl3_i8_lab.so \
+    && nvcc $F -I$CUT/include -I$CUT/tools/util/include lab_once/cmp_i8mm.cu -o /opt/exl3-once/cmp_i8mm.so
 
 COPY serve.sh /opt/cmp170hx/serve.sh
 LABEL org.opencontainers.image.source="https://github.com/AlexBrandes/vllm" \

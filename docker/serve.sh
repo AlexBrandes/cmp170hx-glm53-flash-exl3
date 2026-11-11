@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 # GLM-5.3-Flash EXL3 2.60 bpw, PP2 / TP1, DFlash2 k3, on two CMP 170HX cards.
-# /model: turboderp/GLM-5.3-Flash-exl3 (sc_2.60bpw); /draft: incoai/GLM-5.3-Flash-DFlash2.
+# /model: turboderp/GLM-5.3-Flash-exl3 (sc_2.60bpw); /draft: incoai/GLM-5.3-Flash-DFlash2;
+# /w8: the INT8 dense sidecar that download.sh builds from zai-org/GLM-5.3-Flash.
 set -euo pipefail
 
 export VLLM_CACHE_ROOT=/cache/vllm
@@ -27,6 +28,10 @@ export VLLM_EXL3_DENSE_DECODE_TC=1
 export VLLM_EXL3_DENSE_DECODE_TC_FAMILIES=all
 export VLLM_EXL3_DENSE_DECODE_SPLITK=1
 export VLLM_EXL3_DECODE_VARIANT=off
+# Dense matrices and LM head from the INT8 sidecar (built from the original
+# weights, not the 6-bit EXL3 copies): INT8 tensor-core GEMMs for prefill and
+# decode, Marlin W8A16 for the LM head. Unset to serve them from EXL3.
+export VLLM_EXL3_DENSE_W8=/w8/dense.safetensors
 
 exec vllm serve /model \
   --host 0.0.0.0 --port 8000 \
