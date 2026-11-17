@@ -41,8 +41,11 @@ sparkDash itself makes one pass per level. The engine serves at most four
 sequences, so there is no 8-request level. Every run is in
 [results/2026-11-11.json](results/2026-11-11.json).
 
-The measured build is the published image below, built with `docker build --no-cache`
-from the pinned sources, serving dense weights that `download.sh` built on the same host.
+The measured build is the 2026-11-11 image (`sha256:daa03754…`, plugin `0c79bc78fd`), built with
+`docker build --no-cache` from the pinned sources, serving dense weights that `download.sh` built on
+the same host. The current image differs from it only in the scheduler (item 4 under
+[What runs](#what-runs) and `--prefill-chunk-with-decodes 2048`): it changes which requests share a
+step, not the arithmetic, and these tables were not re-measured for it.
 
 **Decode, aggregate tok/s**
 
@@ -106,8 +109,8 @@ Sent to the engine directly. Greedy with thinking off, except GPQA Diamond.
 
 | | |
 |---|---|
-| Engine | Three pins from [AlexBrandes/vllm](https://github.com/AlexBrandes/vllm), in `versions.env`: upstream vLLM's wheel for [`a0d7356b98`](https://github.com/vllm-project/vllm/commit/a0d7356b98e929c17051bac44f5a086e4117974d); the fork's vLLM branch at [`ea2ef399a6`](https://github.com/AlexBrandes/vllm/commit/ea2ef399a614ea72b65b15804000342f629a850f), Python files over the wheel; and the vllm-cmp170hx plugin at [`0c79bc78fd`](https://github.com/AlexBrandes/vllm/commit/0c79bc78fdc30708f1995d5759828d2a08e39f04) |
-| Image | `ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:daa037541ed91b304c5f4168b6dad4820362ef25c1e6ba3193bf5aef562ed076` (tag `engine-ea2ef399a6-0c79bc78fd`): CUDA 13.0 Ubuntu 24.04 base pinned by digest, plus the three pins, each fetched by commit and checked by sha256. `docker/build.sh` rebuilds it (two compiler jobs, about 18 minutes, no GPU needed) |
+| Engine | Three pins from [AlexBrandes/vllm](https://github.com/AlexBrandes/vllm), in `versions.env`: upstream vLLM's wheel for [`a0d7356b98`](https://github.com/vllm-project/vllm/commit/a0d7356b98e929c17051bac44f5a086e4117974d); the fork's vLLM branch at [`ea2ef399a6`](https://github.com/AlexBrandes/vllm/commit/ea2ef399a614ea72b65b15804000342f629a850f), Python files over the wheel; and the vllm-cmp170hx plugin at [`7129837ee1`](https://github.com/AlexBrandes/vllm/commit/7129837ee1ed5d4ae6d6bfed0ffe0d26bd06d9f9) |
+| Image | `ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:1112f996472f364b3d7ebc44ef2719ab1e3db64b5f3240472a127482b8dfb0ec` (tag `engine-ea2ef399a6-7129837ee1`): CUDA 13.0 Ubuntu 24.04 base pinned by digest, plus the three pins, each fetched by commit and checked by sha256. `docker/build.sh` rebuilds it (two compiler jobs, about 18 minutes, no GPU needed) |
 | Checkpoint | [`turboderp/GLM-5.3-Flash-exl3`](https://huggingface.co/turboderp/GLM-5.3-Flash-exl3/tree/24781209f2862a939cc21e01d256c943bd1a58a3), branch `sc_2.60bpw`, revision `24781209f2862a939cc21e01d256c943bd1a58a3`: 2.5-bit routed experts, 6-bit dense and attention matrices, LM head and vision tower |
 | Dense weights | An INT8 copy of every dense text matrix (attention, MLA projections, indexer, shared experts, the three dense MLPs) and the LM head, built by `download.sh` from the original [`zai-org/GLM-5.3-Flash`](https://huggingface.co/zai-org/GLM-5.3-Flash/tree/46a050bec13002ad29ee795c16e61cf4fa3c4a9c) weights at revision `46a050bec13002ad29ee795c16e61cf4fa3c4a9c` ([tools/convert_dense.py](tools/convert_dense.py)): one scale per output channel, 7.9 GB. The dense matrices are stored in EXL3's rotated input space and run as INT8 × INT8 with per-token activation scales; the LM head runs INT8 weights against FP16 activations. The checkpoint's 6-bit copies of these matrices are not loaded |
 | Drafter | [`incoai/GLM-5.3-Flash-DFlash2`](https://huggingface.co/incoai/GLM-5.3-Flash-DFlash2/tree/bf582e4eacc1810f76656d1811693ff6c6737d2a) at revision `bf582e4eacc1810f76656d1811693ff6c6737d2a`, BF16, 3 draft tokens per step |
@@ -133,7 +136,10 @@ The vLLM branch is upstream plus the fork's commits; the
 3. **Chunked KDA attention prefill on sm_80** (`VLLM_SM80_KDA_PREFILL`).
 4. **Pipeline scheduling for these kernels**: decodes spread over the in-flight
    micro-batches, one phase per step (`VLLM_PP_SPREAD_DECODES`,
-   `VLLM_PP_HOMOGENEOUS_STEPS`).
+   `VLLM_PP_HOMOGENEOUS_STEPS`). Each decode-only step takes the streams served
+   longest ago, so with several requests decoding none waits behind the others
+   while a long prompt is prefilled, and prefill keeps the full 2,048-token step
+   budget beside running decodes (`--prefill-chunk-with-decodes 2048`).
 5. **INT8 dense matrices from the original weights** (`VLLM_EXL3_DENSE_W8`):
    INT8 tensor-core GEMMs for prefill and decode, and an INT8-weight Marlin
    kernel for the LM head. These replace the tensor-core EXL3 paths for every
