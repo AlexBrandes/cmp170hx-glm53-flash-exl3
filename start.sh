@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start GLM-5.3-Flash (EXL3 2.6 bpw, Q4N-X routed experts) pipeline-parallel on two CMP 170HX cards.
+# Start GLM-5.3-Flash (EXL3 2.6 bpw, Q4NX routed experts) pipeline-parallel on two CMP 170HX cards.
 #   ./start.sh          start the container, wait for /health
 # Settings: .env (see .env.example) or environment variables. Engine settings
 # are in docker/serve.sh, mounted over the image's copy.
