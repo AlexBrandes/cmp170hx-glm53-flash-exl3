@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Download the checkpoint and the drafter at the pinned revisions.
-#   ./download.sh       (MODELS_DIR=./models by default; ~113 GB kept, ~126 GB peak)
-# Also builds the INT8 dense sidecar: fetches the dense text weights of the original
-# checkpoint (13.2 GB, range requests; the routed experts are not downloaded) and
-# converts them in the engine image (tools/convert_dense.py, a few CPU minutes).
+# Download the checkpoint and the drafter at the pinned revisions, and build the
+# 4-bit drafter.
+#   ./download.sh       (MODELS_DIR=./models by default; ~118 GB kept, ~120 GB peak)
+# The checkpoint repo includes the INT8 dense weights the engine serves
+# (int8/dense.safetensors). The drafter is downloaded in BF16 and converted to
+# 4 bits in the engine image (tools/convert_draft.py, about a minute on the CPU);
+# the BF16 copy is removed afterwards unless KEEP_DRAFT_BF16=1.
 # The drafter is CC BY-NC-ND 4.0 (non-commercial); read its model card first.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -11,25 +13,31 @@ cd "$(dirname "$0")"
 [ -f .env ] && . ./.env
 IMAGE=${IMAGE:-${ENGINE_IMAGE:-$ENGINE_IMAGE_LOCAL}}
 MODELS_DIR=${MODELS_DIR:-$PWD/models}
-MODEL_DIR=${MODEL_DIR:-$MODELS_DIR/GLM-5.3-Flash-exl3-sc_2.60bpw}
-DRAFT_DIR=${DRAFT_DIR:-$MODELS_DIR/GLM-5.3-Flash-DFlash2}
-ORIG_DIR=${ORIG_DIR:-$MODELS_DIR/GLM-5.3-Flash-dense-orig}
-W8_DIR=${W8_DIR:-$MODELS_DIR/GLM-5.3-Flash-dense-w8}
-mkdir -p "$MODEL_DIR" "$DRAFT_DIR" "$ORIG_DIR" "$W8_DIR"
+MODEL_DIR=${MODEL_DIR:-$MODELS_DIR/GLM-5.3-Flash-Q4NX-2.6bpw}
+DRAFT_DIR=${DRAFT_DIR:-$MODELS_DIR/GLM-5.3-Flash-DFlash2-w4a16}
+DRAFT_SRC_DIR=${DRAFT_SRC_DIR:-$MODELS_DIR/GLM-5.3-Flash-DFlash2}
+mkdir -p "$MODEL_DIR" "$DRAFT_DIR"
 docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE"
-docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e HF_TOKEN="${HF_TOKEN:-}" \
-  -v "$MODEL_DIR:/model" -v "$DRAFT_DIR:/draft" --entrypoint python3 "$IMAGE" -c "
+run() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e HF_TOKEN="${HF_TOKEN:-}" \
+          --entrypoint python3 "$@"; }
+
+run -v "$MODEL_DIR:/model" "$IMAGE" -c "
 from huggingface_hub import snapshot_download
 snapshot_download('$MODEL_REPO', revision='$MODEL_REVISION', local_dir='/model')
-snapshot_download('$DRAFT_REPO', revision='$DRAFT_REVISION', local_dir='/draft')
-print('model and drafter ready')"
+print('checkpoint ready: $MODEL_DIR')"
 
-if [ ! -s "$W8_DIR/dense.safetensors" ]; then
-  run() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/tools:/tools:ro" \
-            -v "$MODEL_DIR:/model:ro" -v "$ORIG_DIR:/orig" -v "$W8_DIR:/w8" --entrypoint python3 "$IMAGE" "$@"; }
-  [ -s "$ORIG_DIR/dense.safetensors" ] || run /tools/fetch_dense.py "$ORIG_REPO" "$ORIG_REVISION" /orig/dense.safetensors
-  run /tools/convert_dense.py /orig/dense.safetensors /model /w8/dense.safetensors.tmp
-  mv "$W8_DIR/dense.safetensors.tmp" "$W8_DIR/dense.safetensors"
-  [ "${KEEP_ORIG:-0}" = 1 ] || rm -f "$ORIG_DIR/dense.safetensors"
-  echo "INT8 dense sidecar ready: $W8_DIR/dense.safetensors"
+if [ ! -s "$DRAFT_DIR/model.safetensors" ]; then
+  mkdir -p "$DRAFT_SRC_DIR"
+  run -v "$DRAFT_SRC_DIR:/draft-src" "$IMAGE" -c "
+from huggingface_hub import snapshot_download
+snapshot_download('$DRAFT_REPO', revision='$DRAFT_REVISION', local_dir='/draft-src')"
+  run -v "$PWD/tools:/tools:ro" -v "$DRAFT_SRC_DIR:/draft-src:ro" -v "$DRAFT_DIR:/draft" "$IMAGE" \
+    /tools/convert_draft.py /draft-src /draft >/dev/null
+  [ "${KEEP_DRAFT_BF16:-0}" = 1 ] || rm -rf "$DRAFT_SRC_DIR"
+fi
+got=$(sha256sum "$DRAFT_DIR/model.safetensors" | cut -d' ' -f1)
+if [ "$got" = "$DRAFT_W4_SHA256" ]; then
+  echo "drafter ready: $DRAFT_DIR (identical to the measured build)"
+else
+  echo "drafter ready: $DRAFT_DIR (sha256 $got; the measured build's is $DRAFT_W4_SHA256)"
 fi

@@ -17,22 +17,27 @@ Engine
   (https://github.com/Morrowmake/vllm-cmp170hx), Apache-2.0.
 
 Model
-- GLM-5.3-Flash by Z.AI, MIT (copy in licenses/GLM-5.3-Flash.LICENSE). The EXL3
-  checkpoint turboderp/GLM-5.3-Flash-exl3 keeps that licence.
-  download.sh also fetches the dense text weights of the original checkpoint
-  zai-org/GLM-5.3-Flash and builds an INT8 copy from them (tools/convert_dense.py);
-  that copy is a derivative under the same licence.
+- GLM-5.3-Flash by Z.AI, MIT (copy in licenses/GLM-5.3-Flash.LICENSE). The
+  checkpoint codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw and its INT8 dense weights
+  are derivatives under the same licence. It was converted with a fork of
+  turboderp's ExLlamaV3 (https://github.com/AlexBrandes/exllamav3, branch q4nx,
+  MIT), calibrated partly on turboderp's GLM-5.3-Flash calibration trace.
 - The DFlash2 drafter incoai/GLM-5.3-Flash-DFlash2 is CC BY-NC-ND 4.0:
-  non-commercial use only, no redistribution.
+  non-commercial use only, no redistribution. download.sh converts it to 4 bits
+  on your machine (tools/convert_draft.py); the converted copy is for your own
+  use under the same terms and is never distributed by this project.
 - This repository ships no weights: download.sh fetches the checkpoint and the
   drafter from their model pages.
 
 Benchmarks
 - Speed tables use the sparkDash protocol (MiaAI-Lab/sparkDash, commit
   3e6d4ef, Apache-2.0); its prompts are used as data with attribution.
-- GSM8K (OpenAI, MIT) as distributed with vLLM's tests/evals/gsm8k, HumanEval
-  (OpenAI, MIT), and GPQA Diamond (Rein et al., CC BY 4.0) with the prompt and
-  answer pattern of OpenAI simple-evals (MIT).
+- GSM8K (OpenAI, MIT) as distributed with vLLM's tests/evals/gsm8k; IFEval
+  (Google, Apache-2.0) with its instruction checkers; HumanEval (OpenAI, MIT)
+  and GPQA Diamond (Rein et al., CC BY 4.0) in the previous results file.
+- Accuracy: the malaiwah GLM-5.3-Flash fidelity suite (BF16 reference hidden
+  states from brandonmusic's BF16 run) and WikiText-2 (Merity et al., CC BY-SA
+  3.0) in the fidelity-v1 test.
 
 Not affiliated with NVIDIA, Z.AI, turboderp, incoai, the vLLM project or any of
 the projects above.

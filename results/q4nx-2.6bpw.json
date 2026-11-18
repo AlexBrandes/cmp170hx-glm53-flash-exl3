@@ -1,0 +1,328 @@
+{
+ "schema_version": 1,
+ "hardware": {
+  "gpu": "2x NVIDIA CMP 170HX",
+  "memory_gib_per_gpu": 64,
+  "sm_count_per_gpu": 74,
+  "power_w_per_gpu": 170,
+  "pcie": "Gen2 x4 per GPU",
+  "gpu_p2p": false,
+  "driver": "610.43.02"
+ },
+ "engine": {
+  "upstream_commit": "a0d7356b98e929c17051bac44f5a086e4117974d",
+  "vllm_branch_commit": "ea2ef399a614ea72b65b15804000342f629a850f",
+  "plugin_commit": "ff413b2df19718342e02d9763f161d69afce7b4a",
+  "measured_deployment": "the production deployment of this build on the measured host (lab image sha256:4884fe2dbb6739e4f61a5a8396d8b148acc78b2e6aaa73b9ac8afb1acc7b7e60 with the same plugin files)",
+  "equivalence_check": "this recipe (start.sh, serve.sh, download.sh output, the published image) served bitwise-identical prompt and generated logprobs to the measured deployment on 1,056 / 4,128 / 16,416-token prompts (1,512 / 6,105 / 22,861 prompt positions) and a chat prompt, every difference 0.0, and passed the 7 image/video/text checks",
+  "published_image": "ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:125662d873c809229ec85ebf18ce76f1f7b9a8a86470edd447880c116af32f8f"
+ },
+ "checkpoint": {
+  "repo": "codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw",
+  "revision": "799c91c775f3cbd98de292329c0efee2ddc5be10",
+  "dense_weights": "int8/dense.safetensors (sha256 bca746e7e15f11e6fa9e6f50be7514232711ccf91c9057add437079974a9d1bd)"
+ },
+ "drafter": {
+  "repo": "incoai/GLM-5.3-Flash-DFlash2",
+  "revision": "bf582e4eacc1810f76656d1811693ff6c6737d2a",
+  "served": "4-bit (W4A16 g128) copy built by tools/convert_draft.py",
+  "sha256": "16180d0ecd7f3f4b99058b67ccff11d171357766e259e2f43da8cb1c40fcc9a9"
+ },
+ "protocol": {
+  "source": "sparkDash",
+  "commit": "3e6d4ef",
+  "endpoint": "engine-direct",
+  "decode_max_tokens": 400,
+  "depth_decode": "benchlib addition, not sparkDash"
+ },
+ "run_ids": [
+  "public-v1.20261117T204519Z.b7b519b1"
+ ],
+ "runs": "one public-v1 run (the previous recipe's results are medians of three)",
+ "settings": {
+  "quantization": "exl3",
+  "load-format": "exl3",
+  "dtype": "bfloat16",
+  "pipeline-parallel-size": 2,
+  "tensor-parallel-size": 1,
+  "mm-encoder-tp-mode": "data",
+  "max-model-len": 225280,
+  "max-num-seqs": 4,
+  "max-num-batched-tokens": 2048,
+  "prefill-chunk-with-decodes": 2048,
+  "block-size": 4608,
+  "gpu-memory-utilization": 0.97,
+  "enable-auto-tool-choice": true,
+  "tool-call-parser": "glm47",
+  "reasoning-parser": "glm47",
+  "enable-prompt-tokens-details": true,
+  "compilation-config": "{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}",
+  "speculative-config": "{\"method\": \"dflash\", \"model\": \"/draft\", \"num_speculative_tokens\": 3, \"quantization\": null, \"draft_load_config\": {\"load_format\": \"safetensors\"}}",
+  "hf-overrides": "{\"text_config\": {\"aux_hidden_state_tensor\": \"stream_mean\"}}"
+ },
+ "decode": {
+  "structured": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": 175.719
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": 274.808
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": 427.572
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": 408.427
+   }
+  ],
+  "prose": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": 111.058
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": 199.536
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": 282.338
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": 274.305
+   }
+  ],
+  "code": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": 161.876
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": 218.076
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": 287.199
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": 313.579
+   }
+  ],
+  "json": [
+   {
+    "concurrency": 1,
+    "aggregate_decode_tps": 152.247
+   },
+   {
+    "concurrency": 2,
+    "aggregate_decode_tps": 232.324
+   },
+   {
+    "concurrency": 4,
+    "aggregate_decode_tps": 349.637
+   },
+   {
+    "concurrency": 8,
+    "aggregate_decode_tps": 346.737
+   }
+  ]
+ },
+ "prefill": [
+  {
+   "target_tokens": 4096,
+   "prompt_tokens": 4127,
+   "samples": 3,
+   "prefill_tps": 4078.24
+  },
+  {
+   "target_tokens": 8192,
+   "prompt_tokens": 8226,
+   "samples": 3,
+   "prefill_tps": 4480.41
+  },
+  {
+   "target_tokens": 16384,
+   "prompt_tokens": 16419,
+   "samples": 3,
+   "prefill_tps": 4568.75
+  },
+  {
+   "target_tokens": 32768,
+   "prompt_tokens": 32801,
+   "samples": 3,
+   "prefill_tps": 4604.63
+  },
+  {
+   "target_tokens": 65536,
+   "prompt_tokens": 65565,
+   "samples": 2,
+   "prefill_tps": 4604.62
+  },
+  {
+   "target_tokens": 131072,
+   "prompt_tokens": 131104,
+   "samples": 2,
+   "prefill_tps": 4446.15
+  }
+ ],
+ "depth_decode": [
+  {
+   "target_tokens": 4096,
+   "prompt_tokens": 4119,
+   "samples": 3,
+   "decode_tps": 113.78
+  },
+  {
+   "target_tokens": 8192,
+   "prompt_tokens": 8213,
+   "samples": 3,
+   "decode_tps": 121.336
+  },
+  {
+   "target_tokens": 16384,
+   "prompt_tokens": 16407,
+   "samples": 3,
+   "decode_tps": 115.89
+  },
+  {
+   "target_tokens": 32768,
+   "prompt_tokens": 32788,
+   "samples": 3,
+   "decode_tps": 122.29
+  },
+  {
+   "target_tokens": 65536,
+   "prompt_tokens": 65556.5,
+   "samples": 2,
+   "decode_tps": 116.747
+  },
+  {
+   "target_tokens": 131072,
+   "prompt_tokens": 131094.5,
+   "samples": 2,
+   "decode_tps": 114.747
+  }
+ ],
+ "quality": {
+  "bf16_panel": {
+   "suite": "malaiwah/GLM-5.3-Flash-fidelity-suite-v1",
+   "contexts": "0-127",
+   "positions": 262016,
+   "kld": 0.1525,
+   "top1": 0.87,
+   "baseline_turboderp_sc_2.60bpw": {
+    "kld": 0.1559,
+    "top1": 0.8681
+   },
+   "paired_delta": -0.0034,
+   "paired_se": 0.0016,
+   "contexts_0_255": {
+    "kld": 0.1595,
+    "top1": 0.8648
+   }
+  },
+  "fidelity_v1": {
+   "run_id": "quality-gate.20261117T165908Z.1113b626",
+   "baseline_run_id": "quality-gate.20261114T045141Z.8b25bb23",
+   "reference": "zai-org/GLM-5.3-Flash FP8 served by stock vLLM, top-20 logprobs",
+   "sequences": 857,
+   "tokens": 336532,
+   "subsets": {
+    "all": {
+     "kld": 0.1511,
+     "baseline_kld": 0.157,
+     "kld_ratio": [
+      0.963,
+      0.952,
+      0.973
+     ],
+     "ppl": 2.727,
+     "baseline_ppl": 2.747,
+     "ref_ppl": 2.441,
+     "ppl_ratio": [
+      0.9925,
+      0.9893,
+      0.9956
+     ]
+    },
+    "wikitext": {
+     "kld": 0.1985,
+     "baseline_kld": 0.2104,
+     "kld_ratio": [
+      0.944,
+      0.93,
+      0.958
+     ],
+     "ppl_ratio": [
+      0.981,
+      0.976,
+      0.986
+     ]
+    },
+    "wikitext_long": {
+     "kld": 0.1699,
+     "baseline_kld": 0.1756,
+     "kld_ratio": [
+      0.968,
+      0.949,
+      0.982
+     ],
+     "ppl_ratio": [
+      0.994,
+      0.988,
+      1.001
+     ]
+    },
+    "chat": {
+     "kld": 0.0616,
+     "baseline_kld": 0.0586,
+     "kld_ratio": [
+      1.05,
+      1.024,
+      1.078
+     ],
+     "ppl_ratio": [
+      1.008,
+      1.006,
+      1.011
+     ]
+    }
+   },
+   "interval": "95 % paired bootstrap over sequences, 4,000 resamples"
+  },
+  "gsm8k": {
+   "run_id": "quality-gate.20261117T171102Z.618bead1",
+   "chat": {
+    "passed": 1229,
+    "total": 1319
+   },
+   "completion": {
+    "passed": 1208,
+    "total": 1319
+   }
+  },
+  "ifeval": {
+   "run_id": "quality-gate.20261117T173437Z.1f62b9c4",
+   "prompt_level_strict": {
+    "passed": 372,
+    "total": 541
+   },
+   "instruction_level_strict": {
+    "passed": 638,
+    "total": 834
+   }
+  },
+  "vision": {
+   "passed": 7,
+   "total": 7
+  }
+ },
+ "kv_cache_tokens": 520579
+}

@@ -1,9 +1,10 @@
 {#- GLM-5.3-Flash chat template for this recipe.
-    Upstream: the checkpoint's chat_template.jinja (sha256 41cff9af7b3a86c9…), unchanged except:
+    Upstream: the chat_template.jinja of turboderp/GLM-5.3-Flash-exl3 (sha256 41cff9af7b3a86c9…),
+    unchanged except:
     1. the generation prompt: with chat_template_kwargs.enable_thinking == false it opens an already
        closed think block (<think></think>); otherwise the upstream <think>. Without this the kwarg
        is silently ignored and every turn thinks.
-    2. media: the checkpoint's template replaces every media part with an "unable to process"
+    2. media: the upstream template replaces every media part with an "unable to process"
        reminder. Image and video parts render the zai-org/GLM-5.3-Flash upstream placeholders instead
        (<|begin_of_image|><|image|><|end_of_image|>, <|begin_of_video|><|video|><|end_of_video|>),
        which vLLM's GLM processor expands. Audio keeps the reminder: the engine has no audio processor.

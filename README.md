@@ -1,18 +1,33 @@
 # GLM-5.3-Flash on 2× CMP 170HX
 
-This runs GLM-5.3-Flash on two NVIDIA CMP 170HX cards, with the model split
-between them. It uses vLLM with turboderp's 2.6-bit EXL3 version of the model and
-serves an OpenAI-compatible API that accepts text, images and video. The cards
-don't need a fast link between them; a PCIe Gen2 x4 connection each is enough.
+This runs GLM-5.3-Flash on two 64 GB NVIDIA CMP 170HX cards, with the model split
+between them. It uses vLLM and serves an OpenAI-compatible API that accepts
+text, images and video. The cards don't need a fast link between them; a PCIe
+Gen2 x4 connection each is enough.
 
-One user gets around 75–100 tokens per second, depending on what's being
-generated. The full numbers and quality checks are under [Benchmarks](#benchmarks).
+The checkpoint is
+[`codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw`](https://huggingface.co/codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw),
+a 2.6-bit EXL3 quantization. Its speed comes from two changes, and from kernel
+work built around them:
+
+- **The Q4N-X codebook** for the routed experts, in place of EXL3's default
+  `mul1`. It was developed for these cards: its weights decode with integer
+  operations straight into INT8 tensor-core operands.
+- **An INT8 copy of the dense weights**, shipped with the checkpoint. The
+  attention, shared-expert and dense matrices and the LM head run as INT8
+  tensor-core GEMMs instead of 6-bit EXL3.
+
+One user gets around 110–175 tokens per second, depending on what's being
+generated. That is 1.5–1.8 times the previous version of this recipe, which
+served turboderp's EXL3 checkpoint of the same size, and prompts are processed
+1.6–1.9 times as fast. Accuracy is nearly identical to that checkpoint. The
+numbers are under [Benchmarks](#benchmarks).
 
 ```bash
 git clone https://github.com/AlexBrandes/cmp170hx-glm53-flash-exl3
 cd cmp170hx-glm53-flash-exl3
-./download.sh     # checkpoint, drafter and INT8 dense weights at pinned revisions (~113 GB)
-./start.sh        # sets the power limit (sudo), starts the container, waits for /health
+./download.sh     # checkpoint (with its INT8 dense weights) and drafter at pinned revisions (~118 GB)
+./start.sh        # starts the container, waits for /health
 ```
 
 The API listens on `127.0.0.1:8000` as model `glm-5.3-flash-exl3-2.60bpw`.
@@ -20,105 +35,151 @@ The API listens on `127.0.0.1:8000` as model `glm-5.3-flash-exl3-2.60bpw`.
 
 ## Requirements
 
-- 2× NVIDIA CMP 170HX, each exposing 64 GiB. No P2P or link modification needed:
+- 2× NVIDIA CMP 170HX, each exposing 64 GB or more. No P2P or link modification needed:
   pipeline parallelism sends one activation per step between the cards.
 - Linux x86-64, NVIDIA driver 580 or newer, Docker with the NVIDIA Container Toolkit.
-- ~126 GB free on an NVMe SSD while `download.sh` runs (113 GB afterwards: the
-  checkpoint, the drafter and the INT8 dense weights), plus the engine image
-  (~8 GB) and compilation caches.
-- `sudo` for `host-tune.sh` (or `HOST_TUNE=0`; see below).
+- ~120 GB free on an NVMe SSD while `download.sh` runs (118 GB afterwards: the
+  checkpoint with its INT8 dense weights, and the 4-bit drafter), plus the engine
+  image (~8 GB) and compilation caches.
 
-The tensor-core paths are selected for the measured shapes (74 SMs per card,
-this checkpoint); anything else falls back to the scalar EXL3 kernels.
+The kernels are tuned for this card (sm_80, 74 SMs) and this checkpoint. The
+Q4N-X routed experts only run on this engine.
 
 ## Benchmarks
 
-Measured 2026-11-11 on 2× CMP 170HX at 170 W per card, using the
-[sparkDash](https://github.com/MiaAI-Lab/sparkDash) benchmark protocol at commit
-`3e6d4ef`: greedy, thinking off, output forced to 400 tokens, sent to the engine
-endpoint. Each cell is the **median of three runs, with the range in brackets**;
-sparkDash itself makes one pass per level. The engine serves at most four
-sequences, so there is no 8-request level. Every run is in
-[results/2026-11-11.json](results/2026-11-11.json).
+Both columns were measured on 2× CMP 170HX at 170 W per card. **Previous** is
+the last version of this recipe: turboderp's
+[`GLM-5.3-Flash-exl3`](https://huggingface.co/turboderp/GLM-5.3-Flash-exl3)
+`sc_2.60bpw` checkpoint (EXL3 with the `mul1` codebook throughout) on that
+version's engine. **This** is the current recipe. Both serve the same INT8 dense
+weights. The speed difference comes from the Q4N-X routed experts and the kernel
+and scheduler work in this engine together; the accuracy difference comes from
+the routed experts.
 
-The measured build is the 2026-11-11 image (`sha256:daa03754…`, plugin `0c79bc78fd`), built with
-`docker build --no-cache` from the pinned sources, serving dense weights that `download.sh` built on
-the same host. The current image differs from it only in the scheduler (item 4 under
-[What runs](#what-runs) and `--prefill-chunk-with-decodes 2048`): it changes which requests share a
-step, not the arithmetic, and these tables were not re-measured for it.
+### Speed
+
+[sparkDash](https://github.com/MiaAI-Lab/sparkDash) protocol at commit
+`3e6d4ef`: greedy, thinking off, output forced to 400 tokens, sent to the engine
+endpoint. Previous is the median of three runs
+([results/2026-11-11.json](results/2026-11-11.json)); this is one run
+([results/q4nx-2.6bpw.json](results/q4nx-2.6bpw.json)). The engine serves at
+most four sequences, so there is no 8-request level.
 
 **Decode, aggregate tok/s**
 
-| Concurrent requests | code | json | prose | structured |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | 88.3 (88.1–88.5) | 87.5 (87.1–89.2) | 76.0 (75.7–76.0) | 101.7 (101.3–102.3) |
-| 2 | 131.9 (128.2–132.3) | 147.6 (147.5–147.7) | 111.6 (110.9–120.5) | 160.0 (159.7–161.4) |
-| 4 | 170.5 (169.2–180.1) | 193.3 (193.1–195.4) | 166.0 (165.4–169.2) | 222.9 (221.7–229.3) |
+| Concurrent requests | Kind | Previous | This |
+| ---: | --- | ---: | ---: |
+| 1 | code | 88.3 | **161.9** |
+| 1 | json | 87.5 | **152.2** |
+| 1 | prose | 76.0 | **111.1** |
+| 1 | structured | 101.7 | **175.7** |
+| 2 | code | 131.9 | **218.1** |
+| 2 | json | 147.6 | **232.3** |
+| 2 | prose | 111.6 | **199.5** |
+| 2 | structured | 160.0 | **274.8** |
+| 4 | code | 170.5 | **287.2** |
+| 4 | json | 193.3 | **349.6** |
+| 4 | prose | 166.0 | **282.3** |
+| 4 | structured | 222.9 | **427.6** |
 
 **Prefill** (one cold request)
 
-| Prompt | Tokens | Prefill tok/s |
-| ---: | ---: | ---: |
-| 4k | 4,129 | 2,474 (2,448–2,479) |
-| 8k | 8,224 | 2,541 (2,541–2,555) |
-| 16k | 16,415 | 2,521 (2,508–2,526) |
-| 32k | 32,800 | 2,501 (2,497–2,504) |
-| 64k | 65,567 | 2,471 (2,469–2,476) |
-| 128k | 131,105 | 2,420 (2,420–2,424) |
+| Prompt | Tokens | Previous tok/s | This tok/s |
+| ---: | ---: | ---: | ---: |
+| 4k | 4,127 | 2,474 | **4,078** |
+| 8k | 8,226 | 2,541 | **4,480** |
+| 16k | 16,419 | 2,521 | **4,569** |
+| 32k | 32,801 | 2,501 | **4,605** |
+| 64k | 65,565 | 2,471 | **4,605** |
+| 128k | 131,104 | 2,420 | **4,446** |
 
 **Decode at depth** (our addition, not part of sparkDash: one request after a
 long prompt, 400 tokens)
 
-| Context | Decode tok/s |
-| ---: | ---: |
-| 4k | 70.7 (70.5–70.8) |
-| 8k | 73.1 (70.4–74.7) |
-| 16k | 71.1 (69.4–71.9) |
-| 32k | 70.5 (68.3–71.3) |
-| 64k | 69.4 (66.8–73.1) |
-| 128k | 72.7 (71.7–75.0) |
+| Context | Previous tok/s | This tok/s |
+| ---: | ---: | ---: |
+| 4k | 70.7 | **113.8** |
+| 8k | 73.1 | **121.3** |
+| 16k | 71.1 | **115.9** |
+| 32k | 70.5 | **122.3** |
+| 64k | 69.4 | **116.7** |
+| 128k | 72.7 | **114.7** |
 
-### Quality
+### Accuracy
 
-Sent to the engine directly. Greedy with thinking off, except GPQA Diamond.
+Against turboderp's EXL3 checkpoint at the same 2.6 bpw (`mul1` codebook
+throughout), both served with the same INT8 dense weights:
 
-| Check | Result |
-|---|---|
-| HumanEval, pass@1 (164 problems) | **141/164** (86.0%) |
-| GSM8K (1,319 test questions) | **1,228/1,319** (93.1%) |
-| GPQA Diamond (198 questions, thinking on) | **174/198** (87.9%) |
-| Image and video input | 7/7: a text control, three single images (4000×3000 to 64×64), two images in one message, two short videos |
-| Needle retrieval at 4k, 16k, 32k and 64k | 16/16 |
-| 225,280-token window | 225,279 prompt tokens + 1 output token accepted; 225,280 refused |
+| | turboderp EXL3 2.6 bpw | Q4N-X 2.6 bpw |
+|---|---:|---:|
+| Checkpoint size | 108.9 GB | 108.9 GB |
+| KL divergence vs BF16 (malaiwah suite) | 0.1559 | **0.1525** |
+| KL divergence vs FP8 (fidelity-v1) | 0.1570 | **0.1511** |
+| Perplexity, fidelity-v1 (FP8: 2.441) | 2.747 | **2.727** |
 
-- **HumanEval** uses EvalPlus's instruct prompt as one chat message (1,024
-  tokens) and OpenAI's `check_correctness` program (3 s limit). The Codex
-  paper's raw-prompt completion mode scores 124/164 here (133/164 on another
-  boot of the same engine: its greedy completions often run to the 512-token
-  limit, so this mode moves by several problems between runs).
-- **GSM8K** runs vLLM's `tests/evals/gsm8k/gsm8k_eval.py` in its chat mode:
-  5-shot, 1,024 tokens, the last integer in the reply. The script's default
-  completion mode scores 1,192/1,319.
-- **GPQA Diamond** uses OpenAI simple-evals' prompt and answer pattern, with
-  thinking on, temperature 1.0 and top_p 0.95 (the checkpoint's
-  `generation_config.json`), up to 65,536 tokens per reply, one pass.
-- With thinking off, replies about video can open with a short description of
-  the frames before the answer.
+Lower is better. The tests are described below.
+
+**KL divergence against the BF16 model**, on the
+[malaiwah GLM-5.3-Flash fidelity suite](https://huggingface.co/datasets/malaiwah/GLM-5.3-Flash-fidelity-suite-v1):
+teacher-forced 2,048-token windows of code, encyclopedic, literary and
+multilingual text, full-vocabulary KL against BF16 reference hidden states
+through the suite's BF16 head. Contexts 0–127 (262,016 positions), paired by
+context. Lower is better.
+
+| | Previous | This |
+|---|---:|---:|
+| Mean KL divergence | 0.1559 | **0.1525** |
+| Top-1 agreement | 86.81 % | **87.00 %** |
+
+Paired difference −0.0034, standard error 0.0016.
+
+**KL divergence and perplexity against the FP8 release**, our fidelity-v1 test:
+the original FP8 checkpoint served by stock vLLM is the reference, and each
+build is scored on the same 857 sequences (336,532 tokens, top-20 logprobs):
+the FP8 model's replies to 280 chat prompts (prose, QA, grounded QA, code,
+reasoning, multilingual, tool calls), 565 WikiText passages and 12 long WikiText
+passages. Ratios are this build over the previous one, with 95 % intervals from
+a paired bootstrap over sequences; below 1 means closer to FP8.
+
+| Subset | KL, previous | KL, this | KL ratio | Perplexity ratio |
+|---|---:|---:|---:|---:|
+| All 857 sequences | 0.1570 | **0.1511** | 0.963 [0.952, 0.973] | 0.9925 [0.9893, 0.9956] |
+| WikiText (565) | 0.2104 | **0.1985** | 0.944 [0.930, 0.958] | 0.981 [0.976, 0.986] |
+| Long WikiText (12) | 0.1756 | **0.1699** | 0.968 [0.949, 0.982] | 0.994 [0.988, 1.001] |
+| Chat replies (280) | **0.0586** | 0.0616 | 1.050 [1.024, 1.078] | 1.008 [1.006, 1.011] |
+
+Perplexity over all 857 sequences: FP8 2.441, previous 2.747, this 2.727.
+
+**Tasks**, sent to the engine directly, greedy with thinking off:
+
+| Check | Previous | This |
+|---|---:|---:|
+| GSM8K, chat, 5-shot (1,319 questions) | 1,228 (93.1 %) | 1,229 (93.2 %) |
+| GSM8K, completion, 5-shot (1,319 questions) | 1,192 (90.4 %) | 1,208 (91.6 %) |
+| IFEval, prompt-level strict (541 prompts) | not run | 372 (68.8 %) |
+| Image and video input | 7/7 | 7/7 |
+
+- **GSM8K** runs vLLM's `tests/evals/gsm8k/gsm8k_eval.py`: 5-shot, the last
+  integer in the reply; chat mode with 1,024 tokens, completion mode with 256.
+- **IFEval** uses Google's instruction checkers, 1,280 tokens per reply.
+- **Image and video**: a text control, three single images (4000×3000 down to
+  64×64), two images in one message, two short videos.
+- Each task score is one run; a few questions either way is run-to-run noise.
 
 ## What runs
 
 | | |
 |---|---|
-| Engine | Three pins from [AlexBrandes/vllm](https://github.com/AlexBrandes/vllm), in `versions.env`: upstream vLLM's wheel for [`a0d7356b98`](https://github.com/vllm-project/vllm/commit/a0d7356b98e929c17051bac44f5a086e4117974d); the fork's vLLM branch at [`ea2ef399a6`](https://github.com/AlexBrandes/vllm/commit/ea2ef399a614ea72b65b15804000342f629a850f), Python files over the wheel; and the vllm-cmp170hx plugin at [`7129837ee1`](https://github.com/AlexBrandes/vllm/commit/7129837ee1ed5d4ae6d6bfed0ffe0d26bd06d9f9) |
-| Image | `ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:1112f996472f364b3d7ebc44ef2719ab1e3db64b5f3240472a127482b8dfb0ec` (tag `engine-ea2ef399a6-7129837ee1`): CUDA 13.0 Ubuntu 24.04 base pinned by digest, plus the three pins, each fetched by commit and checked by sha256. `docker/build.sh` rebuilds it (two compiler jobs, about 18 minutes, no GPU needed) |
-| Checkpoint | [`turboderp/GLM-5.3-Flash-exl3`](https://huggingface.co/turboderp/GLM-5.3-Flash-exl3/tree/24781209f2862a939cc21e01d256c943bd1a58a3), branch `sc_2.60bpw`, revision `24781209f2862a939cc21e01d256c943bd1a58a3`: 2.5-bit routed experts, 6-bit dense and attention matrices, LM head and vision tower |
-| Dense weights | An INT8 copy of every dense text matrix (attention, MLA projections, indexer, shared experts, the three dense MLPs) and the LM head, built by `download.sh` from the original [`zai-org/GLM-5.3-Flash`](https://huggingface.co/zai-org/GLM-5.3-Flash/tree/46a050bec13002ad29ee795c16e61cf4fa3c4a9c) weights at revision `46a050bec13002ad29ee795c16e61cf4fa3c4a9c` ([tools/convert_dense.py](tools/convert_dense.py)): one scale per output channel, 7.9 GB. The dense matrices are stored in EXL3's rotated input space and run as INT8 × INT8 with per-token activation scales; the LM head runs INT8 weights against FP16 activations. The checkpoint's 6-bit copies of these matrices are not loaded |
-| Drafter | [`incoai/GLM-5.3-Flash-DFlash2`](https://huggingface.co/incoai/GLM-5.3-Flash-DFlash2/tree/bf582e4eacc1810f76656d1811693ff6c6737d2a) at revision `bf582e4eacc1810f76656d1811693ff6c6737d2a`, BF16, 3 draft tokens per step |
+| Engine | Three pins from [AlexBrandes/vllm](https://github.com/AlexBrandes/vllm), in `versions.env`: upstream vLLM's wheel for [`a0d7356b98`](https://github.com/vllm-project/vllm/commit/a0d7356b98e929c17051bac44f5a086e4117974d); the fork's vLLM branch at [`ea2ef399a6`](https://github.com/AlexBrandes/vllm/commit/ea2ef399a614ea72b65b15804000342f629a850f), Python files over the wheel; and the vllm-cmp170hx plugin at [`ff413b2df1`](https://github.com/AlexBrandes/vllm/commit/ff413b2df19718342e02d9763f161d69afce7b4a) |
+| Image | `ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:125662d873c809229ec85ebf18ce76f1f7b9a8a86470edd447880c116af32f8f` (tag `engine-ea2ef399a6-ff413b2df1`): CUDA 13.0 Ubuntu 24.04 base pinned by digest, plus the three pins, each fetched by commit and checked by sha256. `docker/build.sh` rebuilds it (two compiler jobs, about 19 minutes, no GPU needed) |
+| Checkpoint | [`codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw`](https://huggingface.co/codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw/tree/799c91c775f3cbd98de292329c0efee2ddc5be10) at revision `799c91c775f3cbd98de292329c0efee2ddc5be10`: routed experts of layers 4–44 in Q4N-X at 2.5 bits, layer 3's experts in EXL3 at 3.5, everything else in EXL3 at 6 (MTP 4). Its model card describes the codebook |
+| Dense weights | The checkpoint's `int8/dense.safetensors` (7.9 GB): every dense text matrix (attention, MLA projections, indexer, shared experts, the three dense MLPs) and the LM head in INT8, made from the original weights with one scale per output row. The dense matrices are stored in EXL3's rotated input space and run as INT8 × INT8 with per-token activation scales; the LM head runs INT8 weights against FP16 activations. The checkpoint's 6-bit copies of these matrices are not loaded |
+| Drafter | [`incoai/GLM-5.3-Flash-DFlash2`](https://huggingface.co/incoai/GLM-5.3-Flash-DFlash2/tree/bf582e4eacc1810f76656d1811693ff6c6737d2a) at revision `bf582e4eacc1810f76656d1811693ff6c6737d2a`, converted by `download.sh` to 4 bits in groups of 128 ([tools/convert_draft.py](tools/convert_draft.py)), 3 draft tokens per step. The drafter only proposes tokens; its precision changes how many are accepted, never the output |
 | Parallelism | pipeline parallel 2, tensor parallel 1, layer split 23/22 (`VLLM_PP_LAYER_PARTITION`); the drafter sits on the second card |
-| Scheduling | up to 2,048 tokens per step; a new prompt prefills 512 tokens per step beside running decodes; prefill and decode tokens never share a step, because the tensor-core kernels are chosen per phase |
+| Scheduling | up to 2,048 tokens per step, including while other requests decode; prefill and decode tokens never share a step, because the tensor-core kernels are chosen per phase |
 | Cache | KV block size 4,608, 225,280-token window, up to 4 sequences, GPU memory utilization 0.97 |
 | Graphs | `FULL_DECODE_ONLY` CUDA graphs |
-| Chat template | [config/chat_template.jinja](config/chat_template.jinja): honours `enable_thinking=false` and renders image and video placeholders, which the checkpoint's template drops |
+| Chat template | [config/chat_template.jinja](config/chat_template.jinja): honours `enable_thinking=false` and renders image and video placeholders |
 
 [docker/serve.sh](docker/serve.sh) holds every environment variable and engine
 argument; `start.sh` mounts it over the copy in the image, so edits take effect
@@ -128,45 +189,57 @@ The vLLM branch is upstream plus the fork's commits; the
 [plugin](https://github.com/AlexBrandes/vllm/tree/plugin) registers the CMP 170HX
 (sm_80) platform and carries the kernels. Among them, this model uses:
 
-1. **Tensor-core EXL3 prefill** for the routed experts and the dense 6-bit
-   matrices (`VLLM_EXL3_MOE_PREFILL_TC`, `VLLM_EXL3_DENSE_PREFILL_TC`).
-2. **Tensor-core EXL3 decode** for the routed experts and every dense matrix,
-   with split-K for the narrow ones (`VLLM_EXL3_MOE_DECODE_TC`,
-   `VLLM_EXL3_DENSE_DECODE_TC`, `VLLM_EXL3_DENSE_DECODE_SPLITK`).
-3. **Chunked KDA attention prefill on sm_80** (`VLLM_SM80_KDA_PREFILL`).
-4. **Pipeline scheduling for these kernels**: decodes spread over the in-flight
+1. **Q4N-X routed experts on INT8 tensor cores**: weights decode with integer
+   operations straight into INT8 operands, against per-row INT8 activations, in
+   prefill and decode (`VLLM_EXL3_Q4N_PREFILL`, `VLLM_EXL3_Q4N_DECODE`), with
+   decode calls of up to 64 rows and a wide combine of the expert outputs
+   (`VLLM_EXL3_MOE_DECODE_TC_MAX_ROWS`, `VLLM_EXL3_MOE_COMBINE_WIDE`).
+2. **INT8 dense matrices** (`VLLM_EXL3_DENSE_W8`, `VLLM_EXL3_DENSE_W8_DECODE`):
+   INT8 tensor-core GEMMs for prefill and decode, and an INT8-weight Marlin
+   kernel for the LM head.
+3. **sm_80 attention and mHC kernels**: chunked KDA prefill, the fused decode
+   kernels, and mHC decode and prefill (`VLLM_SM80_KDA_PREFILL`,
+   `VLLM_AMPERE_DECODE_KERNELS`, `VLLM_SM80_MHC_DECODE`, `VLLM_SM80_MHC_PREFILL`).
+4. **Repeatable sparse attention**: the DSA indexer returns its top-k in sorted
+   order with canonical ties, so identical requests give identical results
+   (`VLLM_SM80_TOPK_SORTED`, `VLLM_SM80_TOPK_CANONICAL_TIES`).
+5. **Pipeline scheduling for these kernels**: decodes spread over the in-flight
    micro-batches, one phase per step (`VLLM_PP_SPREAD_DECODES`,
    `VLLM_PP_HOMOGENEOUS_STEPS`). Each decode-only step takes the streams served
    longest ago, so with several requests decoding none waits behind the others
-   while a long prompt is prefilled, and prefill keeps the full 2,048-token step
-   budget beside running decodes (`--prefill-chunk-with-decodes 2048`).
-5. **INT8 dense matrices from the original weights** (`VLLM_EXL3_DENSE_W8`):
-   INT8 tensor-core GEMMs for prefill and decode, and an INT8-weight Marlin
-   kernel for the LM head. These replace the tensor-core EXL3 paths for every
-   dense matrix; the routed experts stay EXL3.
+   while a long prompt is prefilled.
+6. **Tensor-core EXL3 kernels** for the tensors that stay in EXL3's `mul1`
+   codebook (layer 3's experts).
 
-### Host settings (`host-tune.sh`)
+### Power limit
 
-`start.sh` runs it through `sudo`; `HOST_TUNE=0` skips it. It sets the **170 W
-power limit** the numbers were measured at on both cards, and nothing else.
+The recipe leaves the cards' power limit alone. The numbers here were measured
+at 170 W per card; to match them, set it yourself
+(`sudo nvidia-smi -i <gpu> -pl 170`).
 
 ### Reasoning
 
 Thinking is on by default; send `"chat_template_kwargs": {"enable_thinking": false}`
-to turn it off. The speed tables, HumanEval and GSM8K have thinking off.
+to turn it off. The speed tables and task scores have thinking off.
 
 ## Caveats
 
 - One host: 2× CMP 170HX at PCIe Gen2 x4, Intel Core Ultra 5 225, 93 GB RAM,
   Ubuntu 24.04, driver 610.43.02. Other hosts have not been measured.
+- This build's numbers were measured on our deployment of the same engine,
+  weights and settings. This recipe run end to end (`download.sh`, `start.sh`
+  and the pinned image) gave bitwise-identical outputs to that deployment on
+  1k–16k-token prompts and passed the same image and video checks.
+- The previous column was recorded on that version's engine and was not re-run
+  to pair it with this one.
 - The drafter is licensed **CC BY-NC-ND 4.0**: non-commercial use only. It is
-  not in the image; `download.sh` fetches it from its model page.
+  not in the image or the checkpoint; `download.sh` fetches it from its model
+  page and converts it locally. `download.sh` reports whether the result matches
+  the measured build's drafter byte for byte; a different CPU can round a few
+  values differently, which changes acceptance slightly, not the output.
 - The EXL3 extension is compiled at build time, so an image rebuilt with
   `docker/build.sh` has its own identity and extension hash.
-- `convert_dense.py` rounds on the CPU it runs on: two machines can disagree in
-  a few INT8 values (4,188 of 7.9 billion, each by one, between our two hosts).
-- The INT8 dense weights take about 1 GB more per card than the 6-bit copies,
-  so the KV cache holds 502,313 tokens: about 2.2 requests at the full
+- The KV cache holds 520,579 tokens: about 2.3 requests at the full
   225,280-token window.
 - The decode-at-depth table and the three-run medians are additions to the
   sparkDash protocol; everything else follows it.
