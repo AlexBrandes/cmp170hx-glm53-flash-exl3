@@ -6,11 +6,11 @@ text, images and video. The cards don't need a fast link between them; a PCIe
 Gen2 x4 connection each is enough.
 
 The checkpoint is
-[`codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw`](https://huggingface.co/codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw),
+[`codebrandes/GLM-5.3-Flash-A4NX-2.6bpw`](https://huggingface.co/codebrandes/GLM-5.3-Flash-A4NX-2.6bpw),
 a 2.6-bit EXL3 quantization. Its speed comes from two changes, and from kernel
 work built around them:
 
-- **The Q4NX codebook** for the routed experts, in place of EXL3's default
+- **The A4NX codebook** for the routed experts, in place of EXL3's default
   `mul1`. It was developed for these cards: its weights decode with integer
   operations straight into INT8 tensor-core operands.
 - **An INT8 copy of the dense weights**, shipped with the checkpoint. The
@@ -43,7 +43,7 @@ The API listens on `127.0.0.1:8000` as model `glm-5.3-flash-exl3-2.60bpw`.
   image (~8 GB) and compilation caches.
 
 The kernels are tuned for this card (sm_80, 74 SMs) and this checkpoint. The
-Q4NX routed experts only run on this engine.
+A4NX routed experts only run on this engine.
 
 ## Benchmarks
 
@@ -52,7 +52,7 @@ the last version of this recipe: turboderp's
 [`GLM-5.3-Flash-exl3`](https://huggingface.co/turboderp/GLM-5.3-Flash-exl3)
 `sc_2.60bpw` checkpoint (EXL3 with the `mul1` codebook throughout) on that
 version's engine. **This** is the current recipe. Both serve the same INT8 dense
-weights. The speed difference comes from the Q4NX routed experts and the kernel
+weights. The speed difference comes from the A4NX routed experts and the kernel
 and scheduler work in this engine together; the accuracy difference comes from
 the routed experts.
 
@@ -110,7 +110,7 @@ long prompt, 400 tokens)
 Against turboderp's EXL3 checkpoint at the same 2.6 bpw (`mul1` codebook
 throughout), both served with the same INT8 dense weights:
 
-| | turboderp EXL3 2.6 bpw | Q4NX 2.6 bpw |
+| | turboderp EXL3 2.6 bpw | A4NX 2.6 bpw |
 |---|---:|---:|
 | Checkpoint size | 108.9 GB | 108.9 GB |
 | KL divergence vs BF16 (malaiwah suite) | 0.1559 | **0.1525** |
@@ -170,9 +170,9 @@ Perplexity over all 857 sequences: FP8 2.441, previous 2.747, this 2.727.
 
 | | |
 |---|---|
-| Engine | Three pins from [AlexBrandes/vllm](https://github.com/AlexBrandes/vllm), in `versions.env`: upstream vLLM's wheel for [`a0d7356b98`](https://github.com/vllm-project/vllm/commit/a0d7356b98e929c17051bac44f5a086e4117974d); the fork's vLLM branch at [`ea2ef399a6`](https://github.com/AlexBrandes/vllm/commit/ea2ef399a614ea72b65b15804000342f629a850f), Python files over the wheel; and the vllm-cmp170hx plugin at [`ff413b2df1`](https://github.com/AlexBrandes/vllm/commit/ff413b2df19718342e02d9763f161d69afce7b4a) |
-| Image | `ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:125662d873c809229ec85ebf18ce76f1f7b9a8a86470edd447880c116af32f8f` (tag `engine-ea2ef399a6-ff413b2df1`): CUDA 13.0 Ubuntu 24.04 base pinned by digest, plus the three pins, each fetched by commit and checked by sha256. `docker/build.sh` rebuilds it (two compiler jobs, about 19 minutes, no GPU needed) |
-| Checkpoint | [`codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw`](https://huggingface.co/codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw/tree/799c91c775f3cbd98de292329c0efee2ddc5be10) at revision `799c91c775f3cbd98de292329c0efee2ddc5be10`: routed experts of layers 4–44 in Q4NX at 2.5 bits, layer 3's experts in EXL3 at 3.5, everything else in EXL3 at 6 (MTP 4). Its model card describes the codebook |
+| Engine | Three pins from [AlexBrandes/vllm](https://github.com/AlexBrandes/vllm), in `versions.env`: upstream vLLM's wheel for [`a0d7356b98`](https://github.com/vllm-project/vllm/commit/a0d7356b98e929c17051bac44f5a086e4117974d); the fork's vLLM branch at [`ea2ef399a6`](https://github.com/AlexBrandes/vllm/commit/ea2ef399a614ea72b65b15804000342f629a850f), Python files over the wheel; and the vllm-cmp170hx plugin at [`c6554be4f7`](https://github.com/AlexBrandes/vllm/commit/c6554be4f79d3a6775807c27bac7267e9fe27909) |
+| Image | `ghcr.io/alexbrandes/cmp170hx-glm53-flash-exl3@sha256:37c0d22edde58044e8b87a0c97925b98536a7c2a9b0b62b8ee5aa5f4a48c8446` (tag `engine-ea2ef399a6-c6554be4f7`): CUDA 13.0 Ubuntu 24.04 base pinned by digest, plus the three pins, each fetched by commit and checked by sha256. `docker/build.sh` rebuilds it (two compiler jobs, about 19 minutes, no GPU needed) |
+| Checkpoint | [`codebrandes/GLM-5.3-Flash-A4NX-2.6bpw`](https://huggingface.co/codebrandes/GLM-5.3-Flash-A4NX-2.6bpw/tree/52aeee1a5aad78517af94a0c72b480b7473839b0) at revision `52aeee1a5aad78517af94a0c72b480b7473839b0`: routed experts of layers 4–44 in A4NX at 2.5 bits, layer 3's experts in EXL3 at 3.5, everything else in EXL3 at 6 (MTP 4). Its model card describes the codebook |
 | Dense weights | The checkpoint's `int8/dense.safetensors` (7.9 GB): every dense text matrix (attention, MLA projections, indexer, shared experts, the three dense MLPs) and the LM head in INT8, made from the original weights with one scale per output row. The dense matrices are stored in EXL3's rotated input space and run as INT8 × INT8 with per-token activation scales; the LM head runs INT8 weights against FP16 activations. The checkpoint's 6-bit copies of these matrices are not loaded |
 | Drafter | [`incoai/GLM-5.3-Flash-DFlash2`](https://huggingface.co/incoai/GLM-5.3-Flash-DFlash2/tree/bf582e4eacc1810f76656d1811693ff6c6737d2a) at revision `bf582e4eacc1810f76656d1811693ff6c6737d2a`, converted by `download.sh` to 4 bits in groups of 128 ([tools/convert_draft.py](tools/convert_draft.py)), 3 draft tokens per step. The drafter only proposes tokens; its precision changes how many are accepted, never the output |
 | Parallelism | pipeline parallel 2, tensor parallel 1, layer split 23/22 (`VLLM_PP_LAYER_PARTITION`); the drafter sits on the second card |
@@ -189,7 +189,7 @@ The vLLM branch is upstream plus the fork's commits; the
 [plugin](https://github.com/AlexBrandes/vllm/tree/plugin) registers the CMP 170HX
 (sm_80) platform and carries the kernels. Among them, this model uses:
 
-1. **Q4NX routed experts on INT8 tensor cores**: weights decode with integer
+1. **A4NX routed experts on INT8 tensor cores**: weights decode with integer
    operations straight into INT8 operands, against per-row INT8 activations, in
    prefill and decode (`VLLM_EXL3_Q4N_PREFILL`, `VLLM_EXL3_Q4N_DECODE`), with
    decode calls of up to 64 rows and a wide combine of the expert outputs
@@ -243,6 +243,24 @@ to turn it off. The speed tables and task scores have thinking off.
   225,280-token window.
 - The decode-at-depth table and the three-run medians are additions to the
   sparkDash protocol; everything else follows it.
+- The tables were measured on the build released as Q4NX (plugin `ff413b2df1`,
+  image `sha256:125662d873…`, checkpoint revision `799c91c`). The renamed build
+  pinned here gives bitwise-identical greedy output on the same prompts.
+
+### Upgrading from the Q4NX release
+
+A4NX was released as Q4NX on 2026-11-18 and renamed because another project
+already uses the name Q4NX, to prevent confusion. Only the name changed: each expert
+matrix's marker key is now `a4nx` instead of `q4nx`, and the engine accepts
+both. A checkpoint downloaded at revision `799c91c` keeps working with this
+recipe. To bring it to the current revision without downloading 109 GB again,
+rename its directory and rewrite the marker keys in place (headers only; tensor
+data is not touched):
+
+```
+mv "$MODELS_DIR/GLM-5.3-Flash-Q4NX-2.6bpw" "$MODELS_DIR/GLM-5.3-Flash-A4NX-2.6bpw"
+python3 tools/rename_marker.py "$MODELS_DIR/GLM-5.3-Flash-A4NX-2.6bpw" --write
+```
 
 ## Licence
 

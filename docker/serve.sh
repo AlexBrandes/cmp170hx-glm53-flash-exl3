@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# GLM-5.3-Flash EXL3 2.6 bpw with Q4NX routed experts, PP2 / TP1, DFlash2 k3, on two CMP 170HX cards.
-# /model: codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw (includes the INT8 dense weights in int8/);
+# GLM-5.3-Flash EXL3 2.6 bpw with A4NX routed experts, PP2 / TP1, DFlash2 k3, on two CMP 170HX cards.
+# /model: codebrandes/GLM-5.3-Flash-A4NX-2.6bpw (includes the INT8 dense weights in int8/);
 # /draft: the 4-bit drafter download.sh builds from incoai/GLM-5.3-Flash-DFlash2.
 set -euo pipefail
 
@@ -28,7 +28,7 @@ export VLLM_SM80_MHC_PREFILL=1
 # identical results (otherwise prompts over 2,048 tokens vary run to run).
 export VLLM_SM80_TOPK_SORTED=1
 export VLLM_SM80_TOPK_CANONICAL_TIES=1
-# Routed experts (Q4NX): INT8 tensor-core GEMMs with per-row INT8 activations in
+# Routed experts (A4NX): INT8 tensor-core GEMMs with per-row INT8 activations in
 # prefill and decode, decode calls up to 64 rows, and the wide combine.
 export VLLM_EXL3_MOE_PREFILL_TC=1
 export VLLM_EXL3_MOE_DECODE_TC=1

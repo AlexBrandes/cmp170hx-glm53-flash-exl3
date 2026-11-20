@@ -18,9 +18,9 @@ Engine
 
 Model
 - GLM-5.3-Flash by Z.AI, MIT (copy in licenses/GLM-5.3-Flash.LICENSE). The
-  checkpoint codebrandes/GLM-5.3-Flash-Q4NX-2.6bpw and its INT8 dense weights
+  checkpoint codebrandes/GLM-5.3-Flash-A4NX-2.6bpw and its INT8 dense weights
   are derivatives under the same licence. It was converted with a fork of
-  turboderp's ExLlamaV3 (https://github.com/AlexBrandes/exllamav3, branch q4nx,
+  turboderp's ExLlamaV3 (https://github.com/AlexBrandes/exllamav3, branch a4nx,
   MIT), calibrated partly on turboderp's GLM-5.3-Flash calibration trace.
 - The DFlash2 drafter incoai/GLM-5.3-Flash-DFlash2 is CC BY-NC-ND 4.0:
   non-commercial use only, no redistribution. download.sh converts it to 4 bits

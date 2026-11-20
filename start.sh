@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start GLM-5.3-Flash (EXL3 2.6 bpw, Q4NX routed experts) pipeline-parallel on two CMP 170HX cards.
+# Start GLM-5.3-Flash (EXL3 2.6 bpw, A4NX routed experts) pipeline-parallel on two CMP 170HX cards.
 #   ./start.sh          start the container, wait for /health
 # Settings: .env (see .env.example) or environment variables. Engine settings
 # are in docker/serve.sh, mounted over the image's copy.
@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 
 IMAGE=${IMAGE:-${ENGINE_IMAGE:-$ENGINE_IMAGE_LOCAL}}
 MODELS_DIR=${MODELS_DIR:-$PWD/models}
-MODEL_DIR=${MODEL_DIR:-$MODELS_DIR/GLM-5.3-Flash-Q4NX-2.6bpw}
+MODEL_DIR=${MODEL_DIR:-$MODELS_DIR/GLM-5.3-Flash-A4NX-2.6bpw}
 DRAFT_DIR=${DRAFT_DIR:-$MODELS_DIR/GLM-5.3-Flash-DFlash2-w4a16}
 CACHE_DIR=${CACHE_DIR:-$PWD/cache}
 GPUS=${GPUS:-0,1}
